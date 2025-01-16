@@ -30,7 +30,7 @@ jobs:
         # Step 2: Retrieve NPM Token with Akeyless
       - name: Akeyless Get Secrets
         id: get_auth_token
-        uses: docker://us-west1-docker.pkg.dev/devopsre/akeyless-public/akeyless-action:latest
+        uses: akeyless-community/akeyless-github-action@v1.0.1
         with:
           api-url: https://api.akeyless.io
           access-id: p-fdtw2qsgdjxcam
