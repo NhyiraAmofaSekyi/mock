@@ -18,6 +18,10 @@ jobs:
       id-token: write
       pull-requests: write
 
+    outputs: 
+      publishedPackages: ${{ steps.changesets.outputs.publishedPackages }}
+      published: ${{ steps.changesets.outputs.published }}
+
     steps:
       # Step 1: Checkout repository
       - name: Checkout Repo
@@ -43,15 +47,55 @@ jobs:
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      # Step 6: Test Changeset with a dry-run
-      - name: Test Changeset with pnpm changeset publish --dry-run
-        run: pnpm changeset publish --dry-run
+      # Step 6: Create Release Pull Request or Publish to npm
+      - name: Test and Publish with Changeset
+        id: changesets
+        uses: changesets/action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        with:
+          publish: pnpm release
+          version: pnpm version-and-reinstall
 
-      # Step 7: Publish to npm (Uncomment for real publish after testing)
-      # - name: Publish to npm
-      #   run: pnpm changeset publish
-      #   env:
-      #     GITHUB_TOKEN: $
+  prepare:
+    name: Format Output for Install
+    if: needs.release.outputs.published
+    needs: release 
+    runs-on: ubuntu-latest
+    container:
+      image: node:20-bullseye
+    outputs:  
+      result: "${{ steps.map.outputs.output }}"
+    steps:              
+      - name: Install jq
+        if: needs.release.outputs.published
+        uses: dcarbone/install-jq-action@v3.0.1
+      - name: Format Published Packages Array
+        if: needs.release.outputs.published
+        uses: cloudposse/github-action-jq@main
+        id: map
+        with:
+          compact: true
+          raw-output: true
+          input: '${{ needs.release.outputs.publishedPackages }}'
+          script: |-
+            map("\(.name)@\(.version)")
+
+  install-released-packages:
+    name: Install Released Packages
+    needs: [prepare, release]
+    if: needs.release.outputs.published
+    runs-on: ubuntu-latest
+    container:
+      image: node:20-bullseye
+    strategy:
+      fail-fast: false
+      max-parallel: 12
+      matrix:
+        package: ${{fromJson(needs.prepare.outputs.result)}}
+    steps:
+      - name: Install Dependencies
+        run: apt update && apt install -y libusb-1.0-0-dev libudev-dev
+      - name: Installing ${{ matrix.package }} package
+        run: pnpm add ${{ matrix.package }} --global
