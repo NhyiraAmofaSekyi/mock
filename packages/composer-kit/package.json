@@ -1,5 +1,5 @@
 {
-  "name": "@composer-kit/ui",
+  "name": "@mock-composer-kit/ui",
   "version": "0.0.0",
   "sideEffects": false,
   "license": "MIT",
